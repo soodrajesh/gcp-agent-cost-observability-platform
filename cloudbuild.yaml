@@ -1,0 +1,13 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: build-pipeline
+    dir: app/pipeline
+    args: ["build", "-t", "${_REPO}/pipeline:${_TAG}", "."]
+  - name: gcr.io/cloud-builders/docker
+    id: build-eval-runner
+    args: ["build", "-t", "${_REPO}/eval-runner:${_TAG}", "-f", "app/judge/Dockerfile", "."]
+images:
+  - "${_REPO}/pipeline:${_TAG}"
+  - "${_REPO}/eval-runner:${_TAG}"
+options:
+  logging: CLOUD_LOGGING_ONLY

@@ -1,0 +1,67 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# No live-deploy job here, deliberately: this CI never touches the live GCP project
+# (no WIF, no gcloud credentials configured). See docs/adr/0005-no-live-deploy-ci.md,
+# the same reasoning as gcp-finops-cost-anomaly-detector's ADR 0004.
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+      - run: terraform -chdir=terraform fmt -check -recursive
+      - run: terraform -chdir=terraform init -backend=false -input=false
+      - run: terraform -chdir=terraform validate
+
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Trivy IaC misconfiguration scan
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          scan-type: config
+          scan-ref: terraform
+          severity: HIGH,CRITICAL
+          exit-code: "0"
+
+  app:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r app/pipeline/requirements-dev.txt
+      - run: ruff check app
+      - run: PYTHONPATH=app pytest app/pipeline/tests -q
+
+  seed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Synthetic eval-history generator runs and is deterministic
+        run: |
+          python3 seed/generate_synthetic_eval_history.py
+          cp seed/synthetic_eval_history.jsonl /tmp/run1.jsonl
+          python3 seed/generate_synthetic_eval_history.py
+          diff /tmp/run1.jsonl seed/synthetic_eval_history.jsonl
+
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: shellcheck -S warning -x scripts/*.sh
+      - run: bash -n scripts/*.sh
