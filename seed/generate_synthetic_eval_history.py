@@ -10,6 +10,7 @@ cost: it only writes a local file that `scripts/up.sh` then loads with `bq load`
 from __future__ import annotations
 
 import json
+import os
 import random
 import sys
 from datetime import datetime, timedelta, timezone
@@ -25,7 +26,10 @@ OUT_PATH = Path(__file__).resolve().parent / "synthetic_eval_history.jsonl"
 
 def main() -> None:
     rng = random.Random(7)
-    now = datetime.now(timezone.utc)
+    # SEED_ANCHOR (ISO-8601) pins the "now" the history is dated back from, so CI can
+    # check that two runs produce identical output. Unset, history ends yesterday.
+    anchor = os.environ.get("SEED_ANCHOR")
+    now = datetime.fromisoformat(anchor) if anchor else datetime.now(timezone.utc)
     n_days = 20
     rows = []
     for day_offset in range(n_days, 0, -1):
