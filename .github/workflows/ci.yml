@@ -53,6 +53,8 @@ jobs:
         with:
           python-version: "3.12"
       - name: Synthetic eval-history generator runs and is deterministic
+        env:
+          SEED_ANCHOR: "2026-01-01T00:00:00+00:00"
         run: |
           python3 seed/generate_synthetic_eval_history.py
           cp seed/synthetic_eval_history.jsonl /tmp/run1.jsonl
